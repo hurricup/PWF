@@ -12,9 +12,6 @@ sub get {
     my $response = PWF::Response::OK->new( 'Test controller' );
     #    say STDERR "Something bad";
     #    warn 'Here is the warning';
-    use PWF::Response::InternalServerError;
-    die PWF::Response::InternalServerError->new( 'custom error' );
-
     return $response;
 }
 

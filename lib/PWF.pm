@@ -3,7 +3,6 @@ use strict;
 use warnings FATAL => 'all';
 use Module::Load;
 use Carp qw/cluck/;
-use PWF::Response::InternalServerError;
 use PWF::App;
 
 sub start_app
@@ -31,8 +30,10 @@ sub start_app
 #@method
 sub get_error_responder
 {
+    require PWF::Response::InternalServerError;
+    require PWF::ResponseWrapper::PSGI;
     return sub{
-        return PWF::Response::InternalServerError->new()->get_psgi_response();
+        return PWF::ResponseWrapper::PSGI->new( PWF::Response::InternalServerError->new() )->process_response;
     };
 }
 
