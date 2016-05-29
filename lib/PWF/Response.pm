@@ -41,14 +41,4 @@ sub get_content
     return $self->{content};
 }
 
-sub get_psgi_response
-{
-    my ($self) = @_;
-    return [
-        $self->get_status,
-        $self->get_headers,
-        $self->get_content,
-    ];
-}
-
 1;

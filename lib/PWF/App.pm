@@ -8,6 +8,11 @@ use PWF::Response;
 use PWF::Response::OK;
 use PWF::Response::InternalServerError;
 use TestSite::Controllers::Main;
+use PWF::ResponseWrapper::PSGI;
+
+use constant {
+    dev_mode => 0
+};
 
 sub new
 {
@@ -15,30 +20,42 @@ sub new
     return bless {}, $proto;
 }
 
-#@returns PWF::Response
-sub dispatch
+#@returns PWF::ResponseWrapper
+sub process_request
 {
     my $self = shift;
     my PWF::Request $request = shift;
     # route
     my $response;
     eval {
-        # fixme controller instantiation should be handled separately
         my $controller = TestSite::Controllers::Main->new( $request );
         $response = $controller->dispatch();
     };
 
     $response = $@ if $@;
-
-    if (UNIVERSAL::isa( $response, 'PWF::Response' ))
-    {
-        return $response;
-    }
-    else
+    unless (UNIVERSAL::isa( $response, 'PWF::Response' ))
     {
         warn "Controller returned $response instead of PWF::Response object";
-        return PWF::Response::InternalServerError->new();
+        $response = PWF::Response::InternalServerError->new();
     }
+
+    return $self->wrap_response( $response );
+}
+
+#@returns PWF::ResponseWrapper
+sub wrap_response
+{
+    my ($self, $response) = @_;
+
+    my $psgi_response = eval {PWF::ResponseWrapper::PSGI->new( $response )};
+    $response = $@ if $@;
+
+    unless (UNIVERSAL::isa( $psgi_response, 'PWF::ResponseWrapper' ))
+    {
+        warn 'Error rendering response';
+        $psgi_response = PWF::ResponseWrapper->new( PWF::Response::InternalServerError->new() );
+    }
+    return $psgi_response;
 }
 
 #@method
@@ -48,9 +65,9 @@ sub get_runner
 
     return sub{
         my $psgi_env = shift;
-        my $request = PWF::Request->new( { %ENV, %$psgi_env } ); # fixme clearly PSGI merging, may be generalized
-        my $response = $self->dispatch( $request );
-        return $response->get_psgi_response;
+        my $request = PWF::Request->new( { %ENV, %$psgi_env } );
+        my $response_wrapper = $self->process_request( $request );
+        return $response_wrapper->process_response;
     };
 }
 
